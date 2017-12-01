@@ -56,16 +56,13 @@
 #include "stm32_mini_board.h"
 #include "FLASH_W25QXX.h"
 #include "app_log.h"
+#include "fatfs.h"
 /* USER CODE END Includes */
 
 /* Variables -----------------------------------------------------------------*/
 osThreadId defaultTaskHandle;
 
 /* USER CODE BEGIN Variables */
-FIL file_handle;
-FATFS SDFatFs;  /* File system object for SD card logical drive */
-
-//uint8_t read[4096];
 /* USER CODE END Variables */
 
 /* Function prototypes -------------------------------------------------------*/
@@ -106,7 +103,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the thread(s) */
   /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0,1800 );
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 1700);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -126,28 +123,7 @@ void StartDefaultTask(void const * argument)
 
   /* USER CODE BEGIN StartDefaultTask */
   /* Infinite loop */
-  
-if(f_mount(&SDFatFs, (TCHAR const*)USER_Path, 0) != FR_OK)
-{
-  APP_LOG_DEBUG("mount failed!\r\n");
-}
-else
-{
-   APP_LOG_DEBUG("mount success!\r\n");
-}
 
- if(f_mkfs((TCHAR const*)USER_Path, 0, 1) != FR_OK)
-  {
-    APP_LOG_DEBUG("mkfs failed!\r\n");
-  }
-else
-{
-   APP_LOG_DEBUG("mkfs success!\r\n");
-}
-
-/*
-  while(1)
-  {
     uint16_t m_id;
     uint8_t id[8];
     m_id=FLASH_W25QXX_Get_Manufacturer_Id();
@@ -156,9 +132,9 @@ else
     FLASH_W25QXX_Get_Unique_Id(id);
     for(uint8_t i=0;i<8;i++)
     {
-     APP_LOG_DEBUG("m_id is:%d\r\n",id[i]);
+     APP_LOG_DEBUG("u_id is:%d\r\n",id[i]);
     }
-    
+    /*
      BSP_W25Q32_Sector_Read( 0, 
                           read,
                            0,
@@ -169,91 +145,221 @@ else
     }
     BSP_W25Q32_Sector_Program( 0, read,  0,  1) ; 
     
-     BSP_W25Q32_Sector_Read( 0, 
+    BSP_W25Q32_Sector_Read( 0, 
                           read,
                            0,
-                            1); 
+                           1); 
     for(uint32_t i=0;i<4096;i++)
     {
       APP_LOG_DEBUG(" %d:\r\n",read[i]);
     }
-  }
 */
-  
+  int SEGGER_RTT_GetKey(void);
   for(;;)
   {
     FRESULT ret;
     UINT bw;
+    char key;
+    osDelay(100);
     uint8_t read[30]={0};
-    ret=f_open (&file_handle, "hello.txt",FA_WRITE|FA_OPEN_ALWAYS);
     
-    if(ret==FR_OK)
-    {
-      APP_LOG_DEBUG("open file success!\r\n");
-      ret= f_write (&file_handle, "wkxboot fat_file_ststem!",30, &bw);	
-      if(ret==FR_OK)
-      {
-        APP_LOG_DEBUG("file write success!\r\n");
-      }
-      else
-      {
-        APP_LOG_DEBUG("file write failed!");
-      }
-    }
-    else
-    {
-     APP_LOG_DEBUG("file open failed!");
-    }    
-    ret= f_close(&file_handle);
-    if(ret==FR_OK)
-    {
-     APP_LOG_DEBUG("file close success!");
-     ret=f_open (&file_handle, "hello.txt",FA_READ);
-      if(ret==FR_OK)
-    {
-      APP_LOG_DEBUG("file open  success!"); 
-     ret= f_read (&file_handle, read, 30 ,&bw);
-     if(ret==FR_OK)
-     {
-       APP_LOG_DEBUG("file read  success!");  
-        for(int i=0;i<30;i++)
-        {
-          APP_LOG_DEBUG("data:\r\n%c",read[i]); 
-        }
-          ret= f_close(&file_handle);
-         if(ret==FR_OK)
-         {
-           APP_LOG_DEBUG("file close  success!");     
-         }
-         else
-         {
-            APP_LOG_DEBUG("file close  failed!");  
-         }
-       
-     }
-     else
-     {
-        APP_LOG_DEBUG("file read  failed!"); 
-     }
-    }
-    else
-    {
-    APP_LOG_DEBUG("file open  failed!");   
-    }
-    }
-    else
-    {
-     APP_LOG_DEBUG("file close failed!"); 
-    }
+   key=(char) SEGGER_RTT_GetKey();
    
-    osDelay(5000);
+   switch(key)
+   {
+   case 'm':
+  if(f_mount(&USERFatFS, (TCHAR const*)USERPath, 1) != FR_OK)
+  {
+   APP_LOG_DEBUG("mount fs failed!\r\n"); 
+  }
+  else
+  {
+   APP_LOG_DEBUG("mount fs success!\r\n");
+  }
+  break;
+ /*
+  case 'f':
+  if(f_mkfs((TCHAR const*)USERPath, 1, 1) != FR_OK)
+  {
+    APP_LOG_DEBUG("mk fs failed!\r\n");
+  }
+  else
+  {
+   APP_LOG_DEBUG("mk fs success!\r\n");
+  }
+  break;
+  case 'o':
+  ret=f_open (&USERFile, "0:/hello.txt",FA_WRITE|FA_READ|FA_OPEN_ALWAYS);   
+   if(ret==FR_OK)
+   {
+    APP_LOG_DEBUG("open file success!\r\n");
+   }
+   else
+   {
+    APP_LOG_DEBUG("open file failed!\r\n");
+   }
+    break;
+    
+   case 'w': 
+   ret= f_write (&USERFile, "wkxboot fat_file_system!",sizeof("wkxboot fat_file_system!"), &bw);	
+   if(ret==FR_OK)
+   {
+   APP_LOG_DEBUG("file write success!\r\n");  
+   }
+   else
+   {
+   APP_LOG_DEBUG("file write failed!\r\n");
+   }  
+   break;
+   
+   case 'c':
+    ret= f_close(&USERFile);
+    if(ret==FR_OK)
+    {
+     APP_LOG_DEBUG("file close success!\r\n");
+    }
+    else
+    {
+     APP_LOG_DEBUG("file close  failed!\r\n");
+    }
+    break;
+ 
+   case 'r': 
+   for(int i=0;i<30;i++)
+   {
+   read[i]=0;
+   }
+   ret= f_read (&USERFile, read, 30 ,&bw);
+   if(ret==FR_OK)
+   {
+   APP_LOG_DEBUG("file read  success!\r\n");  
+   read[29]=0;
+   APP_LOG_DEBUG("data:\r\n%s",read); 
+   }
+   else
+   {
+   APP_LOG_DEBUG("file read  failed!\r\n"); 
+   }
+  break;
+  
+  case 'l':
+  ret = f_lseek(&USERFile, 3);
+  
+   if(ret==FR_OK)
+   {
+   APP_LOG_DEBUG("file lseek  success!\r\n");  
+   }
+   else
+   {
+  APP_LOG_DEBUG("file lseek  failed!\r\n");  
+   }
+  break;
+*/
+  case 'u':
+  FILINFO info;
+  ret = f_stat("0:/hello.txt", &info);
+  
+   if(ret==FR_OK)
+   {
+   APP_LOG_DEBUG("file status  success!\r\n");  
+   APP_LOG_INFO("file name:%s\r\n",info.fname);
+   APP_LOG_INFO("file time:%d\r\n",info.fdate);
+   }
+   else
+   {
+  APP_LOG_DEBUG("file status  failed!\r\n");  
+   }
+  break;
+ FRESULT scan_files (
+    char* path       
+ );
+ 
+   case 'd':
+   uint8_t buff[50];
+   buff[0]='/';
+    scan_files (
+     buff        
+ ); 
+ break;
+ 
+  /*
+   case 'i':
+ FRESULT open_dir();
+  ret =open_dir();
+  if (ret == FR_OK) {
+    APP_LOG_DEBUG("打开文件夹成功！\r\n");
+  }
+  else
+  {
+   APP_LOG_DEBUG("打开文件夹失败！\r\n");
+  }
+  break;
+*/
+  /*
+   case 'x':
+     ret=f_mkdir("0:/xxoo");
+   if (ret == FR_OK)
+   {
+     APP_LOG_DEBUG("创建文件夹成功！\r\n");
+   }
+   else
+   {
+       APP_LOG_DEBUG("创建文件夹失败！\r\n");
+   }
+*/
+  case 's':
+  APP_LOG_DEBUG("file size:%d\r\n",f_size(&USERFile));  
+  break;  
+  case 'p':
+  APP_LOG_DEBUG("file pointer:%d\r\n",f_tell(&USERFile));  
+  break;  
+   
+   }
+   
+   
   }
 
   /* USER CODE END StartDefaultTask */
 }
 
 /* USER CODE BEGIN Application */
-     
+
+FRESULT open_dir()
+{
+     DIR dir; 
+    return f_opendir(&dir,"0:/xxoo");                       /* Open the directory */
+}
+
+FRESULT scan_files (
+    char* path        /* Start node to be scanned (***also used as work area***) */
+)
+{
+    FRESULT res;
+    DIR dir;
+    UINT i;
+    static FILINFO fno;
+
+
+    res = f_opendir(&dir, path);                       /* Open the directory */
+    if (res == FR_OK) {
+        for (;;) {
+            res = f_readdir(&dir, &fno);                   /* Read a directory item */
+            if (res != FR_OK || fno.fname[0] == 0) break;  /* Break on error or end of dir */
+            if (fno.fattrib & AM_DIR) {                    /* It is a directory */
+                i = strlen(path);
+                sprintf(&path[i], "/%s", fno.fname);
+                res = scan_files(path);                    /* Enter the directory */
+                if (res != FR_OK) break;
+                path[i] = 0;
+            } else {                                       /* It is a file. */
+                APP_LOG_INFO("%s/%s\n", path, fno.fname);
+            }
+        }
+        f_closedir(&dir);
+    }
+
+    return res;
+}   
 /* USER CODE END Application */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
